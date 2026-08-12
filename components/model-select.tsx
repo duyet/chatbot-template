@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { BROWSER_MODEL_ID } from "@/lib/browser-model"
 import { type GatewayModel } from "@/lib/models"
+import { isWebLLMModelId } from "@/lib/webllm-models"
 import {
   Select,
   SelectContent,
@@ -28,8 +29,11 @@ export function ModelSelect({
     [models]
   )
 
-  const hostedItems = items.filter((item) => item.value !== BROWSER_MODEL_ID)
-  const onDeviceItems = items.filter((item) => item.value === BROWSER_MODEL_ID)
+  const isOnDevice = (value: string) =>
+    value === BROWSER_MODEL_ID || isWebLLMModelId(value)
+
+  const hostedItems = items.filter((item) => !isOnDevice(item.value))
+  const onDeviceItems = items.filter((item) => isOnDevice(item.value))
 
   return (
     <Select

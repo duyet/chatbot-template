@@ -26,6 +26,9 @@ importers:
       '@browser-ai/core':
         specifier: ^3.0.0
         version: 3.0.0(ai@7.0.58(zod@4.4.3))
+      '@browser-ai/web-llm':
+        specifier: ^3.0.0
+        version: 3.0.0(@mlc-ai/web-llm@0.2.84)(ai@7.0.58(zod@4.4.3))
       '@shadcn/react':
         specifier: ^0.3.0
         version: 0.3.0(@types/react@19.2.18)(react@19.2.4)
@@ -314,6 +317,12 @@ packages:
     peerDependencies:
       ai: ^7.0.0
 
+  '@browser-ai/web-llm@3.0.0':
+    resolution: {integrity: sha512-Es610Y2a+PFsrqVTSCUJuxoWmEtlUuonHwti4yTBwSCpz+gEzt5J2uozIwyEtoOzP6Lp0Wh0Eyr8QcrVLyiWEQ==}
+    peerDependencies:
+      '@mlc-ai/web-llm': ^0.2.79
+      ai: ^7.0.0
+
   '@dotenvx/dotenvx@1.75.1':
     resolution: {integrity: sha512-/BITOC9dmS/edY2zQwZNicQ059O6RKabtQfyEafV0nGtfYRNHYy1DIPiYVcov40+tob9hfmBnbR963dS+EQ1DQ==}
     hasBin: true
@@ -583,6 +592,9 @@ packages:
 
   '@mediapipe/tasks-text@0.10.35':
     resolution: {integrity: sha512-BlRWXZAHakqtAos8hNgSU0jy4mh60R9ewzwckS3q2nV7Q/7L65otCtoDrgslRBhlfbElfcHbHQXKRahlMRCf4Q==}
+
+  '@mlc-ai/web-llm@0.2.84':
+    resolution: {integrity: sha512-hrOWzK4/nGNmgoRKT8pgVmZZ2oEPpbblIWQOwpqNyvK2dysHw3KVB1gNJOuRcQfKOPhucEhX1NJzXzgMDnwSCQ==}
 
   '@modelcontextprotocol/sdk@1.30.0':
     resolution: {integrity: sha512-xKd8OIzlqNzcqcNumGAa6g+PW2kjD5vrpcKOnfldAUPP3j7lnqMPwlTXQm8gF+UwH72z0lqaRbjr9hqGz0eITA==}
@@ -2321,6 +2333,10 @@ packages:
     resolution: {integrity: sha512-i24m8rpwhmPIS4zscNzK6MSEhk0DUWa/8iYQWxhffV8jkI4Phvs3F+quL5xvS0gdQR0FyTCMMH33Y78dDTzzIw==}
     engines: {node: '>=18'}
 
+  loglevel@1.9.2:
+    resolution: {integrity: sha512-HgMmCqIJSAKqo68l0rS2AanEWfkxaZ5wNiEFb5ggm08lDs9Xl2KxBlX3PTcaD2chBM1gXAYf491/M2Rv8Jwayg==}
+    engines: {node: '>= 0.6.0'}
+
   longest-streak@3.1.0:
     resolution: {integrity: sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==}
 
@@ -3668,6 +3684,11 @@ snapshots:
       '@mediapipe/tasks-text': 0.10.35
       ai: 7.0.58(zod@4.4.3)
 
+  '@browser-ai/web-llm@3.0.0(@mlc-ai/web-llm@0.2.84)(ai@7.0.58(zod@4.4.3))':
+    dependencies:
+      '@mlc-ai/web-llm': 0.2.84
+      ai: 7.0.58(zod@4.4.3)
+
   '@dotenvx/dotenvx@1.75.1':
     dependencies:
       '@dotenvx/primitives': 0.8.0
@@ -3910,6 +3931,10 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@mediapipe/tasks-text@0.10.35': {}
+
+  '@mlc-ai/web-llm@0.2.84':
+    dependencies:
+      loglevel: 1.9.2
 
   '@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.76)':
     dependencies:
@@ -5702,6 +5727,8 @@ snapshots:
     dependencies:
       chalk: 5.6.2
       is-unicode-supported: 1.3.0
+
+  loglevel@1.9.2: {}
 
   longest-streak@3.1.0: {}
 

@@ -10,9 +10,16 @@ import {
   type ChatTransport,
 } from "ai"
 import { browserAI } from "@browser-ai/core"
+import { type WebLLMLanguageModel } from "@browser-ai/web-llm"
 import { type GatewayModel } from "@/lib/models"
 import { type ChatUIMessage } from "@/tools"
 import { BROWSER_MODEL_ID, BROWSER_MODEL_NAME } from "@/lib/browser-model"
+import {
+  WEBLLM_MODELS,
+  getWebLLMModel,
+  isWebLLMModelId,
+  supportsWebGPU,
+} from "@/lib/webllm-models"
 import { useBrowserModel } from "@/hooks/use-browser-model"
 import { ChatMessage } from "@/components/chat-message"
 import { PromptForm } from "@/components/prompt-form"
@@ -35,6 +42,17 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
 
+type WebLLMStatus = "idle" | "loading" | "ready"
+
+// @browser-ai/web-llm pulls in the WebLLM/tvmjs runtime, which is several
+// megabytes. Load it lazily (and once) so visitors who never touch a WebLLM
+// model never pay for it.
+let webLLMModulePromise: Promise<typeof import("@browser-ai/web-llm")> | null =
+  null
+function loadWebLLMModule() {
+  return (webLLMModulePromise ??= import("@browser-ai/web-llm"))
+}
+
 export function Chat({ models }: { models: GatewayModel[] }) {
   const [model, setModel] = React.useState(models[0]?.id ?? "")
   const {
@@ -43,6 +61,74 @@ export function Chat({ models }: { models: GatewayModel[] }) {
     startDownload,
   } = useBrowserModel()
 
+  // WebGPU support is only knowable on the client; useSyncExternalStore lets
+  // the server snapshot stay `false` (matching the initial client render)
+  // and the real value take over once hydrated, with no effect-driven
+  // setState and no hydration mismatch.
+  const gpuSupported = React.useSyncExternalStore(
+    React.useCallback(() => () => {}, []),
+    supportsWebGPU,
+    () => false
+  )
+
+  const [webllmStatus, setWebllmStatus] = React.useState<
+    Record<string, WebLLMStatus>
+  >({})
+  const [webllmProgress, setWebllmProgress] = React.useState<
+    Record<string, number>
+  >({})
+  const webllmStatusRef = React.useRef<Record<string, WebLLMStatus>>({})
+
+  // One WebLLMLanguageModel instance per registry id, created only once the
+  // (lazily loaded) module resolves.
+  const webllmModelsRef = React.useRef(
+    new Map<string, Promise<WebLLMLanguageModel>>()
+  )
+  const getWebLLMLanguageModel = React.useCallback((registryId: string) => {
+    let instance = webllmModelsRef.current.get(registryId)
+    if (!instance) {
+      instance = loadWebLLMModule().then((mod) => mod.webLLM(registryId))
+      webllmModelsRef.current.set(registryId, instance)
+    }
+    return instance
+  }, [])
+
+  const startWebLLMDownload = React.useCallback(
+    (id: string) => {
+      const current = webllmStatusRef.current[id] ?? "idle"
+      if (current === "loading" || current === "ready") return
+      const webllmModel = getWebLLMModel(id)
+      if (!webllmModel) return
+
+      webllmStatusRef.current[id] = "loading"
+      setWebllmStatus((prev) => ({ ...prev, [id]: "loading" }))
+      setWebllmProgress((prev) => ({ ...prev, [id]: 0 }))
+
+      getWebLLMLanguageModel(webllmModel.registryId)
+        .then((model) =>
+          model.createSessionWithProgress((fraction) => {
+            setWebllmProgress((prev) => ({ ...prev, [id]: fraction }))
+          })
+        )
+        .then(() => {
+          webllmStatusRef.current[id] = "ready"
+          setWebllmStatus((prev) => ({ ...prev, [id]: "ready" }))
+        })
+        .catch(() => {
+          webllmStatusRef.current[id] = "idle"
+          setWebllmStatus((prev) => ({ ...prev, [id]: "idle" }))
+        })
+        .finally(() => {
+          setWebllmProgress((prev) => {
+            const next = { ...prev }
+            delete next[id]
+            return next
+          })
+        })
+    },
+    [getWebLLMLanguageModel]
+  )
+
   const browserModelLabel =
     browserAvailability === "downloadable"
       ? `${BROWSER_MODEL_NAME} — download`
@@ -50,15 +136,35 @@ export function Chat({ models }: { models: GatewayModel[] }) {
         ? `${BROWSER_MODEL_NAME} — downloading…`
         : BROWSER_MODEL_NAME
 
-  const allModels = React.useMemo(
-    () =>
+  const allModels = React.useMemo(() => {
+    const chromeEntry =
       browserAvailability === "downloadable" ||
       browserAvailability === "downloading" ||
       browserAvailability === "available"
-        ? [{ id: BROWSER_MODEL_ID, name: browserModelLabel }, ...models]
-        : models,
-    [models, browserAvailability, browserModelLabel]
-  )
+        ? [{ id: BROWSER_MODEL_ID, name: browserModelLabel }]
+        : []
+
+    const webllmEntries = gpuSupported
+      ? WEBLLM_MODELS.map((webllmModel) => {
+          const status = webllmStatus[webllmModel.id] ?? "idle"
+          const name =
+            status === "loading"
+              ? `${webllmModel.name} — downloading…`
+              : status === "idle"
+                ? `${webllmModel.name} — download`
+                : webllmModel.name
+          return { id: webllmModel.id, name }
+        })
+      : []
+
+    return [...chromeEntry, ...webllmEntries, ...models]
+  }, [
+    models,
+    browserAvailability,
+    browserModelLabel,
+    gpuSupported,
+    webllmStatus,
+  ])
 
   // Default to the on-device model once it reports ready, unless the user
   // has already picked a model themselves. "downloadable" is deliberately
@@ -80,32 +186,61 @@ export function Chat({ models }: { models: GatewayModel[] }) {
     modelRef.current = resolvedModel
   }, [resolvedModel])
 
-  // Delegating transport: the browser model runs fully in-process (no
-  // server round-trip), every other model goes through /api/chat as usual.
-  // Built once so useChat doesn't re-init when the user switches models.
+  // Delegating transport: on-device models (Chrome built-in, WebLLM) run
+  // fully in-process (no server round-trip), every other model goes through
+  // /api/chat as usual. Built once so useChat doesn't re-init when the user
+  // switches models.
   const transport = React.useMemo(() => {
     const http = new DefaultChatTransport<ChatUIMessage>({ api: "/api/chat" })
-    // The direct transport has no tools, so it can't be typed against
-    // ChatUIMessage's tool-part union; it only ever handles plain text
-    // replies for the browser model, so we bridge the two at the call site.
+    // The direct transports have no tools, so they can't be typed against
+    // ChatUIMessage's tool-part union; they only ever handle plain text
+    // replies for on-device models, so we bridge the two at the call site.
     let direct: DirectChatTransport | null = null
     const getDirect = () =>
       (direct ??= new DirectChatTransport({
         agent: new ToolLoopAgent({ model: browserAI() }),
       }))
 
+    // One DirectChatTransport (and its ToolLoopAgent) per WebLLM model id,
+    // so switching between them doesn't rebuild the agent each time. Built
+    // lazily since constructing it needs the (dynamically imported) model.
+    const webllmTransports = new Map<string, Promise<DirectChatTransport>>()
+    const getWebLLMTransport = (id: string) => {
+      let webllmTransport = webllmTransports.get(id)
+      if (!webllmTransport) {
+        const webllmModel = getWebLLMModel(id)
+        if (!webllmModel) return null
+        webllmTransport = getWebLLMLanguageModel(webllmModel.registryId).then(
+          (model) =>
+            new DirectChatTransport({ agent: new ToolLoopAgent({ model }) })
+        )
+        webllmTransports.set(id, webllmTransport)
+      }
+      return webllmTransport
+    }
+
     return {
-      sendMessages: (options) =>
-        modelRef.current === BROWSER_MODEL_ID
-          ? getDirect().sendMessages(
+      sendMessages: async (options) => {
+        if (modelRef.current === BROWSER_MODEL_ID) {
+          return getDirect().sendMessages(
+            options as Parameters<DirectChatTransport["sendMessages"]>[0]
+          )
+        }
+        if (isWebLLMModelId(modelRef.current)) {
+          const webllmTransport = getWebLLMTransport(modelRef.current)
+          if (webllmTransport) {
+            return (await webllmTransport).sendMessages(
               options as Parameters<DirectChatTransport["sendMessages"]>[0]
             )
-          : http.sendMessages(options),
-      // The direct transport has no persistent server-side stream to
+          }
+        }
+        return http.sendMessages(options)
+      },
+      // The direct transports have no persistent server-side stream to
       // reconnect to; only the HTTP transport supports this.
       reconnectToStream: (options) => http.reconnectToStream(options),
     } satisfies ChatTransport<ChatUIMessage>
-  }, [])
+  }, [getWebLLMLanguageModel])
 
   const { messages, sendMessage, status, stop, error, addToolOutput } =
     useChat<ChatUIMessage>({
@@ -117,7 +252,10 @@ export function Chat({ models }: { models: GatewayModel[] }) {
 
   const isBusy = status === "submitted" || status === "streaming"
   const isDownloadingSelectedModel =
-    resolvedModel === BROWSER_MODEL_ID && browserAvailability === "downloading"
+    (resolvedModel === BROWSER_MODEL_ID &&
+      browserAvailability === "downloading") ||
+    (isWebLLMModelId(resolvedModel) &&
+      webllmStatus[resolvedModel] === "loading")
 
   const lastMessage = messages.at(-1)
   const pendingQuestion =
@@ -215,6 +353,12 @@ export function Chat({ models }: { models: GatewayModel[] }) {
                 : "The on-device model downloads when selected (Chrome desktop, large download)."}
             </p>
           )}
+        {isWebLLMModelId(resolvedModel) &&
+          webllmStatus[resolvedModel] === "loading" && (
+            <p className="text-xs text-muted-foreground">
+              {`Downloading ${getWebLLMModel(resolvedModel)?.name ?? resolvedModel}… ${Math.round((webllmProgress[resolvedModel] ?? 0) * 100)}%`}
+            </p>
+          )}
         <PromptForm
           models={allModels}
           model={resolvedModel}
@@ -226,6 +370,8 @@ export function Chat({ models }: { models: GatewayModel[] }) {
               browserAvailability === "downloadable"
             ) {
               startDownload()
+            } else if (isWebLLMModelId(next)) {
+              startWebLLMDownload(next)
             }
           }}
           isBusy={isBusy}
