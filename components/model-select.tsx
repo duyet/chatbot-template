@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { BROWSER_MODEL_ID } from "@/lib/browser-model"
+import { isGatewayModelId } from "@/lib/gateway-models"
 import { type GatewayModel } from "@/lib/models"
 import { isWebLLMModelId } from "@/lib/webllm-models"
 import {
@@ -31,8 +32,12 @@ export function ModelSelect({
 
   const builtInItems = items.filter((item) => item.value === BROWSER_MODEL_ID)
   const webllmItems = items.filter((item) => isWebLLMModelId(item.value))
+  const gatewayItems = items.filter((item) => isGatewayModelId(item.value))
   const hostedItems = items.filter(
-    (item) => item.value !== BROWSER_MODEL_ID && !isWebLLMModelId(item.value)
+    (item) =>
+      item.value !== BROWSER_MODEL_ID &&
+      !isWebLLMModelId(item.value) &&
+      !isGatewayModelId(item.value)
   )
 
   return (
@@ -64,6 +69,16 @@ export function ModelSelect({
           <SelectGroup>
             <SelectLabel>On-device (WebLLM)</SelectLabel>
             {webllmItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
+        {gatewayItems.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>AI Gateway</SelectLabel>
+            {gatewayItems.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
