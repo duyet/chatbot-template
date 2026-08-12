@@ -43,10 +43,18 @@ interface AnyRouterMetrics {
 async function fetchMetrics(model: AnyRouterModel): Promise<number> {
   try {
     const url = model.links?.metrics
-      ? new URL(model.links.metrics, "https://anyrouter.dev").toString()
-      : `${ANYROUTER_BASE_URL}/models/${encodeURIComponent(model.id)}/metrics`
+      ? new URL(model.links.metrics, "https://anyrouter.dev")
+      : new URL(`${ANYROUTER_BASE_URL}/models/${encodeURIComponent(model.id)}/metrics`)
 
-    const res = await fetch(url, { next: { revalidate: 3600 } })
+    // Only ever call anyrouter.dev — model.links.metrics comes from the
+    // catalog response, so don't let it redirect requests elsewhere.
+    if (url.protocol !== "https:" || url.hostname !== "anyrouter.dev") return 0
+
+    const res = await fetch(url, {
+      next: { revalidate: 3600 },
+      redirect: "error",
+      signal: AbortSignal.timeout(5_000),
+    })
     if (!res.ok) return 0
 
     const data = (await res.json()) as AnyRouterMetrics
@@ -66,6 +74,7 @@ export async function getModels(): Promise<GatewayModel[]> {
     const res = await fetch(`${ANYROUTER_BASE_URL}/models`, {
       headers,
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) throw new Error(`AnyRouter models request failed: ${res.status}`)
 
@@ -110,5 +119,10 @@ export async function getModels(): Promise<GatewayModel[]> {
 }
 
 export function isModelAllowed(id: string, models: GatewayModel[]) {
-  return models.some((model) => model.id === id)
+  // The UI may have rendered the fallback list before the catalog loaded, so
+  // accept those ids too even once the real catalog is available.
+  return (
+    models.some((model) => model.id === id) ||
+    FALLBACK_MODELS.some((model) => model.id === id)
+  )
 }
