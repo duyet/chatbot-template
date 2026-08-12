@@ -14,6 +14,7 @@ A minimal chatbot template built with Next.js, the [AI SDK](https://ai-sdk.dev),
 - Tool calling example
 - Web search via each provider's built-in search tool
 - Human-in-the-loop questionnaire. The model can ask clarifying questions, answered with the shadcn questionnaire component
+- On desktop Chrome with built-in AI available, a "Chrome built-in (Gemini Nano)" on-device model option appears in the picker and runs fully client-side (no API key, no server calls)
 
 ## Deploy
 
