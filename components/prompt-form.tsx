@@ -17,6 +17,7 @@ export function PromptForm({
   model,
   onModelChange,
   isBusy,
+  disabled = false,
   onSubmit,
   onStop,
 }: {
@@ -24,6 +25,10 @@ export function PromptForm({
   model: string
   onModelChange: (model: string) => void
   isBusy: boolean
+  /** Blocks submission (e.g. the on-device model is downloading) without
+   * swapping the send button into a stop button — there's no in-flight
+   * stream to stop. */
+  disabled?: boolean
   onSubmit: (text: string) => void
   onStop: () => void
 }) {
@@ -32,7 +37,7 @@ export function PromptForm({
   function handleSubmit(event?: React.FormEvent) {
     event?.preventDefault()
     const text = input.trim()
-    if (!text || isBusy) return
+    if (!text || isBusy || disabled) return
     onSubmit(text)
     setInput("")
   }
@@ -80,7 +85,7 @@ export function PromptForm({
               variant="default"
               aria-label="Send message"
               className="ml-auto"
-              disabled={!input.trim()}
+              disabled={!input.trim() || disabled}
             >
               <ArrowUpIcon />
             </InputGroupButton>

@@ -37,16 +37,27 @@ import {
 
 export function Chat({ models }: { models: GatewayModel[] }) {
   const [model, setModel] = React.useState(models[0]?.id ?? "")
-  const { availability: browserAvailability } = useBrowserModel()
+  const {
+    availability: browserAvailability,
+    downloadProgress,
+    startDownload,
+  } = useBrowserModel()
+
+  const browserModelLabel =
+    browserAvailability === "downloadable"
+      ? `${BROWSER_MODEL_NAME} — download`
+      : browserAvailability === "downloading"
+        ? `${BROWSER_MODEL_NAME} — downloading…`
+        : BROWSER_MODEL_NAME
 
   const allModels = React.useMemo(
     () =>
       browserAvailability === "downloadable" ||
       browserAvailability === "downloading" ||
       browserAvailability === "available"
-        ? [{ id: BROWSER_MODEL_ID, name: BROWSER_MODEL_NAME }, ...models]
+        ? [{ id: BROWSER_MODEL_ID, name: browserModelLabel }, ...models]
         : models,
-    [models, browserAvailability]
+    [models, browserAvailability, browserModelLabel]
   )
 
   // Default to the on-device model once it reports ready, unless the user
@@ -105,6 +116,8 @@ export function Chat({ models }: { models: GatewayModel[] }) {
     })
 
   const isBusy = status === "submitted" || status === "streaming"
+  const isDownloadingSelectedModel =
+    resolvedModel === BROWSER_MODEL_ID && browserAvailability === "downloading"
 
   const lastMessage = messages.at(-1)
   const pendingQuestion =
@@ -131,12 +144,13 @@ export function Chat({ models }: { models: GatewayModel[] }) {
             </EmptyHeader>
             <EmptyContent>
               <Suggestions
-                onSelect={(prompt) =>
+                onSelect={(prompt) => {
+                  if (isDownloadingSelectedModel) return
                   sendMessage(
                     { text: prompt },
                     { body: { model: resolvedModel } }
                   )
-                }
+                }}
               />
             </EmptyContent>
           </Empty>
@@ -197,8 +211,8 @@ export function Chat({ models }: { models: GatewayModel[] }) {
             browserAvailability === "downloading") && (
             <p className="text-xs text-muted-foreground">
               {browserAvailability === "downloading"
-                ? "Downloading on-device model…"
-                : "The on-device model downloads on first message (Chrome desktop, large download)."}
+                ? `Downloading on-device model… ${Math.round((downloadProgress ?? 0) * 100)}%`
+                : "The on-device model downloads when selected (Chrome desktop, large download)."}
             </p>
           )}
         <PromptForm
@@ -207,8 +221,15 @@ export function Chat({ models }: { models: GatewayModel[] }) {
           onModelChange={(next) => {
             userPickedModel.current = true
             setModel(next)
+            if (
+              next === BROWSER_MODEL_ID &&
+              browserAvailability === "downloadable"
+            ) {
+              startDownload()
+            }
           }}
           isBusy={isBusy}
+          disabled={isDownloadingSelectedModel}
           onSubmit={(text) =>
             sendMessage({ text }, { body: { model: resolvedModel } })
           }
