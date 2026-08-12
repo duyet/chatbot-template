@@ -29,11 +29,11 @@ export function ModelSelect({
     [models]
   )
 
-  const isOnDevice = (value: string) =>
-    value === BROWSER_MODEL_ID || isWebLLMModelId(value)
-
-  const hostedItems = items.filter((item) => !isOnDevice(item.value))
-  const onDeviceItems = items.filter((item) => isOnDevice(item.value))
+  const builtInItems = items.filter((item) => item.value === BROWSER_MODEL_ID)
+  const webllmItems = items.filter((item) => isWebLLMModelId(item.value))
+  const hostedItems = items.filter(
+    (item) => item.value !== BROWSER_MODEL_ID && !isWebLLMModelId(item.value)
+  )
 
   return (
     <Select
@@ -50,10 +50,20 @@ export function ModelSelect({
         alignItemWithTrigger={false}
         className="w-auto min-w-(--anchor-width)"
       >
-        {onDeviceItems.length > 0 && (
+        {builtInItems.length > 0 && (
           <SelectGroup>
-            <SelectLabel>On-device</SelectLabel>
-            {onDeviceItems.map((item) => (
+            <SelectLabel>Chrome built-in</SelectLabel>
+            {builtInItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
+        {webllmItems.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>On-device (WebLLM)</SelectLabel>
+            {webllmItems.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
