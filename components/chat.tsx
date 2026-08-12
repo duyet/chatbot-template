@@ -44,10 +44,21 @@ export function Chat({ models }: { models: GatewayModel[] }) {
       browserAvailability === "downloadable" ||
       browserAvailability === "downloading" ||
       browserAvailability === "available"
-        ? [...models, { id: BROWSER_MODEL_ID, name: BROWSER_MODEL_NAME }]
+        ? [{ id: BROWSER_MODEL_ID, name: BROWSER_MODEL_NAME }, ...models]
         : models,
     [models, browserAvailability]
   )
+
+  // Default to the on-device model once it reports ready, unless the user
+  // has already picked a model themselves. "downloadable" is deliberately
+  // excluded — defaulting to it would trigger a multi-GB download on the
+  // first message.
+  const userPickedModel = React.useRef(false)
+  React.useEffect(() => {
+    if (!userPickedModel.current && browserAvailability === "available") {
+      setModel(BROWSER_MODEL_ID)
+    }
+  }, [browserAvailability])
 
   const resolvedModel = allModels.some((m) => m.id === model)
     ? model
@@ -193,7 +204,10 @@ export function Chat({ models }: { models: GatewayModel[] }) {
         <PromptForm
           models={allModels}
           model={resolvedModel}
-          onModelChange={setModel}
+          onModelChange={(next) => {
+            userPickedModel.current = true
+            setModel(next)
+          }}
           isBusy={isBusy}
           onSubmit={(text) =>
             sendMessage({ text }, { body: { model: resolvedModel } })

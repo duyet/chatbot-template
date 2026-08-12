@@ -42,15 +42,10 @@ export function ModelSelect({
       <SelectTrigger aria-label="Model" className="bg-background">
         <SelectValue />
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false}>
-        <SelectGroup>
-          <SelectLabel>AnyRouter</SelectLabel>
-          {hostedItems.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectGroup>
+      <SelectContent
+        alignItemWithTrigger={false}
+        className="w-auto min-w-(--anchor-width)"
+      >
         {onDeviceItems.length > 0 && (
           <SelectGroup>
             <SelectLabel>On-device</SelectLabel>
@@ -61,6 +56,14 @@ export function ModelSelect({
             ))}
           </SelectGroup>
         )}
+        <SelectGroup>
+          <SelectLabel>AnyRouter</SelectLabel>
+          {hostedItems.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   )
