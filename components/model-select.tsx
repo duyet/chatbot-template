@@ -2,12 +2,14 @@
 
 import * as React from "react"
 
+import { BROWSER_MODEL_ID } from "@/lib/browser-model"
 import { type GatewayModel } from "@/lib/models"
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -26,6 +28,9 @@ export function ModelSelect({
     [models]
   )
 
+  const hostedItems = items.filter((item) => item.value !== BROWSER_MODEL_ID)
+  const onDeviceItems = items.filter((item) => item.value === BROWSER_MODEL_ID)
+
   return (
     <Select
       items={items}
@@ -37,9 +42,23 @@ export function ModelSelect({
       <SelectTrigger aria-label="Model" className="bg-background">
         <SelectValue />
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false}>
+      <SelectContent
+        alignItemWithTrigger={false}
+        className="w-auto min-w-(--anchor-width)"
+      >
+        {onDeviceItems.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>On-device</SelectLabel>
+            {onDeviceItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
         <SelectGroup>
-          {items.map((item) => (
+          <SelectLabel>AnyRouter</SelectLabel>
+          {hostedItems.map((item) => (
             <SelectItem key={item.value} value={item.value}>
               {item.label}
             </SelectItem>

@@ -4,13 +4,17 @@
   "type": "module",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": ">=22.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node --env-file-if-exists=.env.local scripts/smoke.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.36",
@@ -18,6 +22,7 @@
     "@ai-sdk/openai": "^4.0.36",
     "@ai-sdk/react": "^4.0.61",
     "@base-ui/react": "^1.7.0",
+    "@browser-ai/core": "^3.0.0",
     "@shadcn/react": "^0.3.0",
     "ai": "^7.0.58",
     "class-variance-authority": "^0.7.1",
