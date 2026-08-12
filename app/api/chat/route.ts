@@ -8,6 +8,8 @@ import {
 } from "ai"
 
 import { anyrouter } from "@/lib/anyrouter"
+import { getGateway } from "@/lib/gateway"
+import { isGatewayModelId, stripGatewayPrefix } from "@/lib/gateway-models"
 import { DEFAULT_MODEL, getModels, isModelAllowed } from "@/lib/models"
 import { getTools, type ChatUIMessage } from "@/tools"
 
@@ -53,7 +55,9 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: anyrouter.chat(modelId),
+    model: isGatewayModelId(modelId)
+      ? getGateway()(stripGatewayPrefix(modelId))
+      : anyrouter.chat(modelId),
     messages: await convertToModelMessages(messages),
     tools,
     stopWhen: isStepCount(5),

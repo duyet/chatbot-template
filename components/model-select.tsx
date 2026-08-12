@@ -3,7 +3,9 @@
 import * as React from "react"
 
 import { BROWSER_MODEL_ID } from "@/lib/browser-model"
+import { isGatewayModelId } from "@/lib/gateway-models"
 import { type GatewayModel } from "@/lib/models"
+import { isWebLLMModelId } from "@/lib/webllm-models"
 import {
   Select,
   SelectContent,
@@ -28,8 +30,15 @@ export function ModelSelect({
     [models]
   )
 
-  const hostedItems = items.filter((item) => item.value !== BROWSER_MODEL_ID)
-  const onDeviceItems = items.filter((item) => item.value === BROWSER_MODEL_ID)
+  const builtInItems = items.filter((item) => item.value === BROWSER_MODEL_ID)
+  const webllmItems = items.filter((item) => isWebLLMModelId(item.value))
+  const gatewayItems = items.filter((item) => isGatewayModelId(item.value))
+  const hostedItems = items.filter(
+    (item) =>
+      item.value !== BROWSER_MODEL_ID &&
+      !isWebLLMModelId(item.value) &&
+      !isGatewayModelId(item.value)
+  )
 
   return (
     <Select
@@ -46,10 +55,30 @@ export function ModelSelect({
         alignItemWithTrigger={false}
         className="w-auto min-w-(--anchor-width)"
       >
-        {onDeviceItems.length > 0 && (
+        {builtInItems.length > 0 && (
           <SelectGroup>
-            <SelectLabel>On-device</SelectLabel>
-            {onDeviceItems.map((item) => (
+            <SelectLabel>Chrome built-in</SelectLabel>
+            {builtInItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
+        {webllmItems.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>On-device (WebLLM)</SelectLabel>
+            {webllmItems.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        )}
+        {gatewayItems.length > 0 && (
+          <SelectGroup>
+            <SelectLabel>AI Gateway</SelectLabel>
+            {gatewayItems.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>

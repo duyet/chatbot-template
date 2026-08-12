@@ -1,4 +1,5 @@
 import { ANYROUTER_BASE_URL } from "@/lib/anyrouter"
+import { GATEWAY_ID_PREFIX } from "@/lib/gateway-models"
 
 export interface GatewayModel {
   id: string
@@ -64,7 +65,48 @@ async function fetchMetrics(model: AnyRouterModel): Promise<number> {
   }
 }
 
-export async function getModels(): Promise<GatewayModel[]> {
+export async function getGatewayModels(): Promise<GatewayModel[]> {
+  if (!process.env.AI_GATEWAY_API_KEY) return []
+
+  try {
+    const res = await fetch("https://ai-gateway.vercel.sh/v1/models", {
+      headers: {
+        Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
+      },
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!res.ok) return []
+
+    const json: unknown = await res.json()
+    const data = Array.isArray((json as { data?: unknown })?.data)
+      ? ((json as { data: unknown[] }).data)
+      : []
+
+    return data
+      .filter((entry): entry is { id: string; name?: string; type?: string; modality?: string } => {
+        if (!entry || typeof entry !== "object" || !("id" in entry)) return false
+        const rec = entry as { id?: unknown; type?: unknown; modality?: unknown }
+        if (typeof rec.id !== "string") return false
+        const type = rec.type
+        const modality = rec.modality
+        if (type !== undefined && type !== "language") return false
+        if (modality !== undefined && modality !== "language" && modality !== "chat") {
+          return false
+        }
+        return true
+      })
+      .slice(0, 10)
+      .map((m) => ({
+        id: GATEWAY_ID_PREFIX + m.id,
+        name: m.name ?? m.id,
+      }))
+  } catch {
+    return []
+  }
+}
+
+async function getAnyRouterModels(): Promise<GatewayModel[]> {
   try {
     const headers: Record<string, string> = {}
     if (process.env.ANYROUTER_API_KEY) {
@@ -116,6 +158,14 @@ export async function getModels(): Promise<GatewayModel[]> {
   } catch {
     return FALLBACK_MODELS
   }
+}
+
+export async function getModels(): Promise<GatewayModel[]> {
+  const [anyrouterModels, gatewayModels] = await Promise.all([
+    getAnyRouterModels(),
+    getGatewayModels(),
+  ])
+  return [...anyrouterModels, ...gatewayModels]
 }
 
 export function isModelAllowed(id: string, models: GatewayModel[]) {
