@@ -32,6 +32,11 @@ export const WEBLLM_MODELS: WebLLMModel[] = [
     name: "SmolLM2 1.7B (~1.8GB)",
     registryId: "SmolLM2-1.7B-Instruct-q4f16_1-MLC",
   },
+  {
+    id: `${WEBLLM_ID_PREFIX}gemma-2-2b-it-q4f16_1-MLC`,
+    name: "Gemma 2 2B (~1.9GB)",
+    registryId: "gemma-2-2b-it-q4f16_1-MLC",
+  },
 ]
 
 export function isWebLLMModelId(id: string): boolean {
