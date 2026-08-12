@@ -51,3 +51,24 @@ export function getWebLLMModel(id: string): WebLLMModel | undefined {
 export function supportsWebGPU(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator
 }
+
+// All curated models are q4f16 builds, which also need the WebGPU
+// `shader-f16` feature — `navigator.gpu` existing isn't enough.
+export async function supportsWebLLMModels(): Promise<boolean> {
+  if (!supportsWebGPU()) return false
+  try {
+    const gpu = (
+      navigator as unknown as {
+        gpu: {
+          requestAdapter(): Promise<{
+            features: ReadonlySet<string>
+          } | null>
+        }
+      }
+    ).gpu
+    const adapter = await gpu.requestAdapter()
+    return adapter?.features.has("shader-f16") ?? false
+  } catch {
+    return false
+  }
+}

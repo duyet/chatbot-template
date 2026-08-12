@@ -18,7 +18,7 @@ import {
   WEBLLM_MODELS,
   getWebLLMModel,
   isWebLLMModelId,
-  supportsWebGPU,
+  supportsWebLLMModels,
 } from "@/lib/webllm-models"
 import { useBrowserModel } from "@/hooks/use-browser-model"
 import { ChatMessage } from "@/components/chat-message"
@@ -42,7 +42,7 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
 
-type WebLLMStatus = "idle" | "loading" | "ready"
+type WebLLMStatus = "idle" | "loading" | "ready" | "failed"
 
 // @browser-ai/web-llm pulls in the WebLLM/tvmjs runtime, which is several
 // megabytes. Load it lazily (and once) so visitors who never touch a WebLLM
@@ -61,15 +61,19 @@ export function Chat({ models }: { models: GatewayModel[] }) {
     startDownload,
   } = useBrowserModel()
 
-  // WebGPU support is only knowable on the client; useSyncExternalStore lets
-  // the server snapshot stay `false` (matching the initial client render)
-  // and the real value take over once hydrated, with no effect-driven
-  // setState and no hydration mismatch.
-  const gpuSupported = React.useSyncExternalStore(
-    React.useCallback(() => () => {}, []),
-    supportsWebGPU,
-    () => false
-  )
+  // WebGPU + shader-f16 support is only knowable on the client, and needs an
+  // async adapter probe — start from `false` (matching the server render) and
+  // let the real value take over after hydration.
+  const [gpuSupported, setGpuSupported] = React.useState(false)
+  React.useEffect(() => {
+    let cancelled = false
+    supportsWebLLMModels().then((supported) => {
+      if (!cancelled) setGpuSupported(supported)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const [webllmStatus, setWebllmStatus] = React.useState<
     Record<string, WebLLMStatus>
@@ -115,8 +119,8 @@ export function Chat({ models }: { models: GatewayModel[] }) {
           setWebllmStatus((prev) => ({ ...prev, [id]: "ready" }))
         })
         .catch(() => {
-          webllmStatusRef.current[id] = "idle"
-          setWebllmStatus((prev) => ({ ...prev, [id]: "idle" }))
+          webllmStatusRef.current[id] = "failed"
+          setWebllmStatus((prev) => ({ ...prev, [id]: "failed" }))
         })
         .finally(() => {
           setWebllmProgress((prev) => {
@@ -150,9 +154,11 @@ export function Chat({ models }: { models: GatewayModel[] }) {
           const name =
             status === "loading"
               ? `${webllmModel.name} — downloading…`
-              : status === "idle"
-                ? `${webllmModel.name} — download`
-                : webllmModel.name
+              : status === "failed"
+                ? `${webllmModel.name} — failed`
+                : status === "idle"
+                  ? `${webllmModel.name} — download`
+                  : webllmModel.name
           return { id: webllmModel.id, name }
         })
       : []
@@ -219,19 +225,31 @@ export function Chat({ models }: { models: GatewayModel[] }) {
       return webllmTransport
     }
 
+    // The on-device agents have no tools, so DirectChatTransport rejects
+    // history containing tool parts (e.g. from earlier hosted-model turns).
+    // Keep only text parts when handing a conversation to them.
+    const toDirectOptions = (
+      options: Parameters<ChatTransport<ChatUIMessage>["sendMessages"]>[0]
+    ) =>
+      ({
+        ...options,
+        messages: options.messages
+          .map((message) => ({
+            ...message,
+            parts: message.parts.filter((part) => part.type === "text"),
+          }))
+          .filter((message) => message.parts.length > 0),
+      }) as Parameters<DirectChatTransport["sendMessages"]>[0]
+
     return {
       sendMessages: async (options) => {
         if (modelRef.current === BROWSER_MODEL_ID) {
-          return getDirect().sendMessages(
-            options as Parameters<DirectChatTransport["sendMessages"]>[0]
-          )
+          return getDirect().sendMessages(toDirectOptions(options))
         }
         if (isWebLLMModelId(modelRef.current)) {
           const webllmTransport = getWebLLMTransport(modelRef.current)
           if (webllmTransport) {
-            return (await webllmTransport).sendMessages(
-              options as Parameters<DirectChatTransport["sendMessages"]>[0]
-            )
+            return (await webllmTransport).sendMessages(toDirectOptions(options))
           }
         }
         return http.sendMessages(options)
@@ -357,6 +375,19 @@ export function Chat({ models }: { models: GatewayModel[] }) {
           webllmStatus[resolvedModel] === "loading" && (
             <p className="text-xs text-muted-foreground">
               {`Downloading ${getWebLLMModel(resolvedModel)?.name ?? resolvedModel}… ${Math.round((webllmProgress[resolvedModel] ?? 0) * 100)}%`}
+            </p>
+          )}
+        {isWebLLMModelId(resolvedModel) &&
+          webllmStatus[resolvedModel] === "failed" && (
+            <p className="text-xs text-destructive">
+              {`Failed to load ${getWebLLMModel(resolvedModel)?.name ?? resolvedModel}. `}
+              <button
+                type="button"
+                className="underline underline-offset-2"
+                onClick={() => startWebLLMDownload(resolvedModel)}
+              >
+                Retry
+              </button>
             </p>
           )}
         <PromptForm
