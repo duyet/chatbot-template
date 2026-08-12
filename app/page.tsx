@@ -1,14 +1,15 @@
 import type { Metadata } from "next"
 
-import { MODELS } from "@/lib/models"
+import { getModels } from "@/lib/models"
 import { Chat } from "@/components/chat"
 
 export const metadata: Metadata = {
   title: "Chat",
   description:
-    "A chatbot template built using shadcn/ui, shadcn/react and shadcn/typeset, powered by the Vercel AI Gateway.",
+    "A chatbot template built using shadcn/ui, shadcn/react and shadcn/typeset, powered by AnyRouter.",
 }
 
-export default function Page() {
-  return <Chat models={MODELS} />
+export default async function Page() {
+  const models = await getModels()
+  return <Chat models={models} />
 }

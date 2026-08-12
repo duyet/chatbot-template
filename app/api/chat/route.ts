@@ -7,16 +7,17 @@ import {
   validateUIMessages,
 } from "ai"
 
-import { DEFAULT_MODEL, isModelAllowed } from "@/lib/models"
+import { anyrouter } from "@/lib/anyrouter"
+import { DEFAULT_MODEL, getModels, isModelAllowed } from "@/lib/models"
 import { getTools, type ChatUIMessage } from "@/tools"
 
 export const maxDuration = 30
 
 const MAX_OUTPUT_TOKENS = 8192
 
-// This endpoint is public and spends your AI Gateway credits on every request.
+// This endpoint is public and spends your AnyRouter credits on every request.
 // Before exposing it to real traffic, add a rate limit (e.g. Vercel Firewall /
-// WAF or @upstash/ratelimit), authentication, and an AI Gateway spend limit.
+// WAF or @upstash/ratelimit), authentication, and an AnyRouter spend limit.
 // See the README "Security" section.
 export async function POST(req: Request) {
   let body: unknown
@@ -29,7 +30,8 @@ export async function POST(req: Request) {
   const model = (body as { model?: unknown })?.model
   const modelId = typeof model === "string" ? model : DEFAULT_MODEL
 
-  if (!isModelAllowed(modelId)) {
+  const models = await getModels()
+  if (!isModelAllowed(modelId, models)) {
     return Response.json(
       { error: `Model ${modelId} is not available.` },
       { status: 400 }
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: modelId,
+    model: anyrouter.chat(modelId),
     messages: await convertToModelMessages(messages),
     tools,
     stopWhen: isStepCount(5),

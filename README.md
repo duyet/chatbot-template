@@ -49,11 +49,14 @@ pnpm dev
 
 ## Configuration
 
-| Env var              | Required       | Description                                                  |
-| -------------------- | -------------- | ------------------------------------------------------------ |
-| `AI_GATEWAY_API_KEY` | Local dev only | AI Gateway API key. Not needed on Vercel deployments (OIDC). |
+| Env var               | Required       | Description                                                                                     |
+| --------------------- | -------------- | ------------------------------------------------------------------------------------------------- |
+| `AI_GATEWAY_API_KEY`  | Local dev only | AI Gateway API key. Not needed on Vercel deployments (OIDC).                                    |
+| `ANYROUTER_API_KEY`   | Yes            | [AnyRouter](https://anyrouter.dev) API key (prefix `sk-ar-`), used to call and rank chat models. |
 
-The model list lives in [lib/models.ts](lib/models.ts) — the first entry is the default model.
+The model list is fetched from AnyRouter at request time in [lib/models.ts](lib/models.ts) — `anyrouter/free` is always the default, ranked by usage otherwise.
+
+Run `pnpm smoke` to verify your `ANYROUTER_API_KEY` works end to end (sends a real chat completion request).
 
 ## Security
 

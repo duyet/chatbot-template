@@ -1,12 +1,10 @@
-import { anthropic } from "@ai-sdk/anthropic"
-import { openai } from "@ai-sdk/openai"
-
+// Provider-native web-search tools (openai.tools.webSearch(), Anthropic's
+// anthropic.tools.webSearch_20260209()) don't ride through AnyRouter's
+// OpenAI-compatible endpoint — the Anthropic-provider tool shape would break
+// requests to anthropic/* models routed via the OpenAI-compatible API. Web
+// search is disabled until AnyRouter adds passthrough for provider-native
+// tools.
 export function getWebSearch(modelId: string) {
-  if (modelId.startsWith("openai/")) {
-    return openai.tools.webSearch()
-  }
-  if (modelId.startsWith("anthropic/")) {
-    return anthropic.tools.webSearch_20260209()
-  }
+  void modelId
   return undefined
 }
